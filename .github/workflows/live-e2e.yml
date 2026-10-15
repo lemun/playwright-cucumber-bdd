@@ -1,0 +1,71 @@
+name: Live e2e (manual)
+
+# The BDD suite against the live Practice Software Testing Toolshop. That site is a shared public
+# demo used by everyone who practises on it, so this workflow never runs on its own: no push, pull
+# request or schedule trigger. Start it from the Actions tab or with
+#   gh workflow run live-e2e.yml -f suite=default
+#
+# Known limit: Cloudflare in front of the Toolshop answers GitHub-hosted runners with a
+# "Verify you are human" challenge (HTTP 403, cf-mitigated: challenge), so on ubuntu-latest the
+# preflight step below usually stops the run. Use a self-hosted runner, or run the suite locally.
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'default = every scenario except @shared-account; shared-account = demo-account sign-ins, one worker'
+        type: choice
+        options: [default, shared-account]
+        default: default
+      runner:
+        description: 'runs-on label (ubuntu-latest, or a self-hosted runner label)'
+        type: string
+        default: ubuntu-latest
+
+permissions:
+  contents: read
+
+concurrency:
+  # One live run at a time, so the shared demo never sees two of these at once.
+  group: live-e2e
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    name: BDD suite against the live Toolshop (${{ inputs.suite }})
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 20
+    steps:
+      - name: Preflight (is the site reachable without a bot challenge?)
+        run: |
+          headers=$(curl -sS -o /dev/null -D - https://practicesoftwaretesting.com/)
+          echo "$headers" | head -1
+          if echo "$headers" | grep -qi '^cf-mitigated: *challenge'; then
+            echo "::error::Cloudflare is challenging this runner's IP. The suite cannot run here; use a self-hosted runner or run it locally."
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run the scenarios
+        id: first
+        run: npm run ${{ inputs.suite == 'shared-account' && 'test:shared-account' || 'test' }}
+        continue-on-error: true
+      - name: Rerun failed scenarios once (live-site flakiness)
+        if: steps.first.outcome == 'failure'
+        run: npm run test:rerun
+      - name: Job summary
+        if: always()
+        run: |
+          files=reports/cucumber-report.json
+          [ -f reports/rerun/cucumber-report.json ] && files="$files reports/rerun/cucumber-report.json"
+          npm run --silent report:summary -- $files >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: cucumber-reports
+          path: reports/
+          retention-days: 14

@@ -1,0 +1,49 @@
+{
+  "name": "playwright-cucumber-bdd",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Cucumber BDD on Playwright in strict TypeScript: typed World, page objects, readable Gherkin, parallel runs, rerun of failures and HTML/JSON reports, against the Practice Software Testing Toolshop demo.",
+  "author": "Shai Sinai",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "playwright",
+    "cucumber",
+    "bdd",
+    "gherkin",
+    "e2e",
+    "test-automation",
+    "typescript"
+  ],
+  "scripts": {
+    "test": "cucumber-js",
+    "test:smoke": "cucumber-js --tags @smoke",
+    "test:shared-account": "cucumber-js --profile sharedAccount",
+    "test:headed": "cross-env HEADLESS=false cucumber-js --parallel 1",
+    "test:rerun": "cucumber-js --profile rerun",
+    "test:dry": "cucumber-js --profile dry",
+    "report:summary": "tsx scripts/report-summary.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:rules": "tsx scripts/check-step-lint-rule.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run typecheck && npm run lint && npm run lint:rules && npm run format:check && npm run test:dry"
+  },
+  "devDependencies": {
+    "@cucumber/cucumber": "^13.3.0",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^22.20.5",
+    "cross-env": "^10.1.0",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.2"
+  }
+}
