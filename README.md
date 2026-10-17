@@ -1,10 +1,77 @@
-# Playwright + Cucumber BDD
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/banner-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/banner-light.png">
+  <img src="docs/assets/banner-light.png" alt="playwright-cucumber-bdd: readable Gherkin, typed Playwright tests, a practice web shop" width="100%">
+</picture>
+
+### Behaviour-driven end-to-end tests that a non-engineer can read.
+
+[![CI](https://github.com/lemun/playwright-cucumber-bdd/actions/workflows/ci.yml/badge.svg)](https://github.com/lemun/playwright-cucumber-bdd/actions/workflows/ci.yml)
+[![Node.js ≥22](https://img.shields.io/badge/node-%E2%89%A522-brightgreen)](package.json)
+[![TypeScript: strict](https://img.shields.io/badge/TypeScript-strict-3178C6)](tsconfig.json)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+[Quick start](#quick-start) · [How it works](#how-it-works) · [Reports](#reports-and-debugging) · [Configuration](#configuration) · [CI](#continuous-integration) · [Limits](#limits-worth-knowing)
+
+</div>
 
 Behaviour-driven end-to-end tests in strict TypeScript: Gherkin features a non-engineer can read,
 backed by [Cucumber.js](https://github.com/cucumber/cucumber-js) and
 [Playwright](https://playwright.dev). The tests run against the
 [Practice Software Testing Toolshop](https://practicesoftwaretesting.com), a demo web shop built for
 learning and practising test automation, with publicly documented demo accounts.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/how-it-works-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/how-it-works.svg">
+    <img src="docs/assets/how-it-works.svg" alt="Diagram: Gherkin features map to step definitions, which call page objects, which drive Playwright against the Practice Software Testing Toolshop. A typed World and hooks supply a fresh browser context, page and page objects per scenario; reports and failure diagnostics are written on the side." width="880">
+  </picture>
+</p>
+
+## Why this project
+
+A complete, runnable Cucumber + Playwright suite that keeps its layers apart and enforces it.
+
+- **Scenarios a product owner can read and review.** Plain-English Gherkin, one sentence per step.
+- **One place for every locator.** Page objects own selectors and actions; steps only describe and
+  assert, and ESLint fails the build if they don't.
+- **Isolated by default.** Every scenario gets a fresh browser context, so parallel runs share no
+  cookies, storage or cart.
+- **Failures you can debug.** A screenshot and the page URL in the report, and a trace for every
+  failed scenario.
+- **A real target.** It runs against a public demo shop built for test practice, so you can try it
+  without an application of your own.
+
+## Quick start
+
+Requires Node.js 22 or newer.
+
+```bash
+npm ci
+npx playwright install chromium
+npm test                               # every scenario except @shared-account, 3 workers
+open reports/cucumber-report.html      # macOS; use xdg-open on Linux
+```
+
+To check the project without a browser or any traffic to the demo site, run the same offline checks
+CI runs (typecheck, lint, lint-rule proof, format check and a Gherkin dry run):
+
+```bash
+npm run check
+```
+
+<p align="center">
+  <img src="docs/assets/offline-checks.gif" alt="Terminal recording: a dry run of the 'Adding a product to the cart' scenario shows each Given, When and Then step mapped to its step definition in src/steps, then npm run check finishes with the typecheck, lint, lint-rule proof, format check and dry run passing and exit code 0." width="880">
+  <br>
+  <sub>Offline checks, no browser: each Gherkin step resolves to exactly one step definition
+  (a dry run reports steps as skipped because it does not execute them).
+  <a href="docs/assets/offline-checks.mp4">Watch the MP4</a>.</sub>
+</p>
+
+## Example
 
 ```gherkin
 Scenario: Combining a category and a brand narrows the results further
@@ -18,34 +85,8 @@ Scenario: Combining a category and a brand narrows the results further
     | Slip Joint Pliers |
 ```
 
-## Features
-
-- **Readable features** covering search, filters, sorting, product details, the cart and sign-in, with
-  scenario outlines, data tables, a background per feature and a custom parameter type (`{sortOrder}`).
-- **A typed World** that works like Playwright Test fixtures: one browser per worker, and a fresh
-  browser context, page and set of page objects for every scenario.
-- **Page objects** that own every locator and action. Step definitions only call page objects and
-  assert, and ESLint enforces it (see [Rules the code follows](#rules-the-code-follows)).
-- **No sleeps**: actions wait for the app's own state (the result grid reports `search_completed`,
-  `filter_completed`, `sorting_completed`) or for a visible outcome such as the cart badge.
-- **Debuggable failures**: a full-page screenshot and the page URL are attached to the HTML report,
-  and a Playwright trace is kept for every failed scenario.
-- **Parallel runs, tags and reruns**: three workers by default, `@smoke` / `@regression` tags, and a
-  rerun profile that replays only the scenarios that failed.
-- **Reports** as Cucumber HTML, JSON and JUnit XML, plus a Markdown summary for CI.
-- **Tooling**: `tsc` in strict mode, typescript-eslint (strict, type-checked), Prettier, and
-  GitHub Actions: offline checks on every push, the live suite only when started by hand.
-
-## Quick start
-
-Requires Node.js 22 or newer.
-
-```bash
-npm ci
-npx playwright install chromium
-npm test                               # every scenario except @shared-account, 3 workers
-open reports/cucumber-report.html      # macOS; use xdg-open on Linux
-```
+The steps behind it live in `src/steps/*.steps.ts` and call page objects through `this.pages`; the
+locators live in `src/pages/`. See [How it works](#how-it-works).
 
 ## Commands
 
@@ -63,17 +104,10 @@ open reports/cucumber-report.html      # macOS; use xdg-open on Linux
 | `npm run check`                             | Typecheck, lint, lint-rule proof, format check and dry run (what CI runs)    |
 | `npm run format`                            | Formats the code with Prettier                                               |
 
-## Architecture
+## How it works
 
-```
-features/*.feature          what the shop should do, in plain English (Gherkin)
-        |
-src/steps/*.steps.ts        glue: maps each sentence to page-object calls and assertions
-        |
-src/pages/*.page.ts         page objects: locators and user actions, no assertions
-        |
-Playwright                  browser automation
-```
+Cucumber reads the features and matches each sentence to a step definition. Steps call page objects
+and assert with `expect`; page objects own the locators and actions and talk to Playwright.
 
 Around that core:
 
@@ -138,6 +172,41 @@ parts are the features, page objects, steps and data.
    accounts, delete the `@shared-account` tag, its profile in `cucumber.js` and the matching npm script.
 5. Run `npm run test:dry` until every step has exactly one definition, then `npm test`.
 
+## Features
+
+- **Readable features** covering search, filters, sorting, product details, the cart and sign-in, with
+  scenario outlines, data tables, a background per feature and a custom parameter type (`{sortOrder}`).
+- **A typed World** that works like Playwright Test fixtures: one browser per worker, and a fresh
+  browser context, page and set of page objects for every scenario.
+- **Page objects** that own every locator and action. Step definitions only call page objects and
+  assert, and ESLint enforces it (see [Rules the code follows](#rules-the-code-follows)).
+- **No sleeps**: actions wait for the app's own state (the result grid reports `search_completed`,
+  `filter_completed`, `sorting_completed`) or for a visible outcome such as the cart badge.
+- **Debuggable failures**: a full-page screenshot and the page URL are attached to the HTML report,
+  and a Playwright trace is kept for every failed scenario.
+- **Parallel runs, tags and reruns**: three workers by default, `@smoke` / `@regression` tags, and a
+  rerun profile that replays only the scenarios that failed.
+- **Reports** as Cucumber HTML, JSON and JUnit XML, plus a Markdown summary for CI.
+- **Tooling**: `tsc` in strict mode, typescript-eslint (strict, type-checked), Prettier, and
+  GitHub Actions: offline checks on every push, the live suite only when started by hand.
+
+## Project structure
+
+```text
+features/                  Gherkin features: search, filters, sorting, product details, cart, sign-in
+src/
+  steps/                   step definitions (*.steps.ts): call page objects and assert
+  pages/                   page objects (*.page.ts), base page and components
+  support/                 World, hooks, parameter types, expect
+  data/                    the Toolshop's published demo customers
+  config.ts                settings from environment variables, validated, with defaults
+scripts/                   report summary and the step lint-rule proof
+test/lint-fixtures/        one forbidden pattern per case, checked by `npm run lint:rules`
+docs/                      sample run, sample report screenshot, README assets
+cucumber.js                profiles: default, sharedAccount, rerun, dry
+.github/workflows/         ci.yml (offline checks) and live-e2e.yml (manual live suite)
+```
+
 ## Reports and debugging
 
 After `npm test`, the `reports/` folder contains:
@@ -152,6 +221,12 @@ After `npm test`, the `reports/` folder contains:
 
 A summary of a real run is in [docs/sample-run.md](docs/sample-run.md), and
 [docs/sample-report.png](docs/sample-report.png) shows the HTML report.
+
+<p align="center">
+  <img src="docs/sample-report.png" alt="Cucumber HTML report from a real run: 25 of 25 scenarios passed" width="880">
+  <br>
+  <sub>The Cucumber HTML report from the sample run.</sub>
+</p>
 
 ## Configuration
 
@@ -195,6 +270,12 @@ npm run test:shared-account
   challenge page. The workflow checks for this first and stops with a clear error. To run
   the live suite in Actions, pass a self-hosted runner label as the `runner` input; otherwise run
   it locally.
+
+## Contributing
+
+Issues and pull requests are welcome. Before opening a pull request, run `npm run check` (what CI
+runs) and, for a new scenario, follow [Adding a scenario](#adding-a-scenario). The live suite
+targets a shared public demo, so please don't start it from a pull request.
 
 ## Limits worth knowing
 
