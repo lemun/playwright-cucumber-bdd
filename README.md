@@ -18,24 +18,21 @@ Scenario: Combining a category and a brand narrows the results further
     | Slip Joint Pliers |
 ```
 
-What it shows:
+## Features
 
-- **Readable features**: five features, 25 scenarios, covering search, filters, sorting, product
-  details, the cart and sign-in. Scenario outlines, data tables, a background per feature and a
-  custom parameter type (`{sortOrder}`).
+- **Readable features** covering search, filters, sorting, product details, the cart and sign-in, with
+  scenario outlines, data tables, a background per feature and a custom parameter type (`{sortOrder}`).
 - **A typed World** that works like Playwright Test fixtures: one browser per worker, and a fresh
   browser context, page and set of page objects for every scenario.
 - **Page objects** that own every locator and action. Step definitions only call page objects and
-  assert. ESLint fails the build if a step imports Playwright, uses the raw page, calls a locator
-  action such as `click()`, `fill()`, `evaluate()` or `screenshot()`, or builds a selector, and a
-  lint fixture proves each case is caught.
+  assert, and ESLint enforces it (see [Rules the code follows](#rules-the-code-follows)).
 - **No sleeps**: actions wait for the app's own state (the result grid reports `search_completed`,
   `filter_completed`, `sorting_completed`) or for a visible outcome such as the cart badge.
 - **Debuggable failures**: a full-page screenshot and the page URL are attached to the HTML report,
   and a Playwright trace is kept for every failed scenario.
 - **Parallel runs, tags and reruns**: three workers by default, `@smoke` / `@regression` tags, and a
   rerun profile that replays only the scenarios that failed.
-- **Reports**: Cucumber HTML, JSON and JUnit XML, plus a Markdown summary for CI.
+- **Reports** as Cucumber HTML, JSON and JUnit XML, plus a Markdown summary for CI.
 - **Tooling**: `tsc` in strict mode, typescript-eslint (strict, type-checked), Prettier, and
   GitHub Actions: offline checks on every push, the live suite only when started by hand.
 
@@ -95,14 +92,18 @@ Around that core:
 ### Rules the code follows
 
 1. **Steps describe, page objects act.** A step never builds a selector or calls Playwright. Steps
-   import `expect` from `support/expect.ts`. In `src/steps/`, ESLint rejects `@playwright/test`
-   imports, `this.page`, and on any member chain: locator actions (`click`, `fill`, `press`,
-   `check`, `selectOption`, `hover`, `type` and the rest), page scripting and capture
-   (`evaluate`, `evaluateAll`, `evaluateHandle`, `screenshot`), explicit waits (`waitFor`),
-   selector builders (`locator`, `getByRole`, ...) and `.page()`. Steps may still pass a page
-   object's locator to `expect`.
+   import `expect` from `support/expect.ts`. In `src/steps/`, ESLint rejects:
+   - `@playwright/test` imports and `this.page`;
+   - locator actions on any member chain (`click`, `fill`, `press`, `check`, `selectOption`,
+     `hover`, `type` and the rest);
+   - page scripting and capture (`evaluate`, `evaluateAll`, `evaluateHandle`, `screenshot`);
+   - explicit waits (`waitFor`);
+   - selector builders (`locator`, `getByRole`, ...) and `.page()`.
+
+   Steps may still pass a page object's locator to `expect`.
    `test/lint-fixtures/steps/forbidden.steps.ts` holds one violation per case, and
    `npm run lint:rules` fails if any of them is not reported.
+
 2. **Page objects don't judge.** They return locators and data (`visibleProductNames()`,
    `cart.lines()`); the step decides what is correct, so one page object serves many scenarios.
 3. **Every scenario starts clean.** A new browser context per scenario means no shared cookies,
@@ -121,6 +122,21 @@ Around that core:
    objects from `this.pages`.
 3. If the page object lacks a locator or action, add it to `src/pages/`. A new page object goes in
    `createPages()` in `src/pages/index.ts`.
+
+### Using this on your own site
+
+The framework (World, hooks, config, page-object base, lint rules, reports) is generic. The Toolshop
+parts are the features, page objects, steps and data.
+
+1. Set `BASE_URL` to your site (see [Configuration](#configuration)).
+2. Check the test-id attribute. `src/support/hooks.ts` points `getByTestId()` at `data-test`, which is
+   what the Toolshop uses. Change it to your app's attribute (often `data-testid`), or remove the line
+   to use Playwright's default.
+3. Replace `features/`, `src/pages/`, `src/steps/` and `src/data/` with your own, and update
+   `createPages()` in `src/pages/index.ts`.
+4. Keep `src/pages/base.page.ts`, `src/support/` and the lint rules. If you have no shared
+   accounts, delete the `@shared-account` tag, its profile in `cucumber.js` and the matching npm script.
+5. Run `npm run test:dry` until every step has exactly one definition, then `npm test`.
 
 ## Reports and debugging
 
@@ -174,9 +190,9 @@ npm run test:shared-account
   public demo, so it only runs when started by hand, from the Actions tab or with
   `gh workflow run live-e2e.yml -f suite=default` (or `-f suite=shared-account`). Only one live
   run is allowed at a time.
-- Cloudflare in front of the Toolshop currently answers GitHub-hosted runners with a "Verify you
-  are human" challenge (HTTP 403, `cf-mitigated: challenge`), so every scenario stops on the
-  challenge page there. The workflow checks for this first and stops with a clear error. To run
+- Cloudflare in front of the Toolshop may answer GitHub-hosted runners with a "Verify you
+  are human" challenge (HTTP 403, `cf-mitigated: challenge`), in which case every scenario stops on the
+  challenge page. The workflow checks for this first and stops with a clear error. To run
   the live suite in Actions, pass a self-hosted runner label as the `runner` input; otherwise run
   it locally.
 
@@ -184,7 +200,7 @@ npm run test:shared-account
 
 - The suite tests a live public demo, so a slow or changed site can fail a run.
 - The expected product names, prices and totals in the features (for example "Claw Hammer" at
-  $11.48) come from the Toolshop's seeded catalog as of October 2026. The demo is shared and
+  $11.48) come from the Toolshop's seeded catalog when the features were written. The demo is shared and
   updated by its maintainers, so they may drift; when they do, update the data tables.
 - Demo accounts are shared with everyone who practises on the site, and other visitors sometimes
   lock one with wrong passwords. If a sign-in scenario fails with "Account locked", switch it to
